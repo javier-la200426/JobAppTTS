@@ -7,6 +7,7 @@ let currentSortDirection = 'asc';
 let historySortColumn = null;
 let historySortDirection = 'asc';
 let currentJobId = null; // Track the currently viewed job in the modal
+let jobDetailsCache = {}; // Cache job details data for faster tab switching
 
 // Debug mode - enabled with ?debug=1 in URL
 const DEBUG = new URLSearchParams(window.location.search).get('debug') === '1';
@@ -76,6 +77,10 @@ function setupAutoRefresh() {
 async function loadAllData() {
     showLoading(true);
     hideError();
+    
+    // Clear job details cache on refresh to ensure fresh data
+    jobDetailsCache = {};
+    debugLog('Cache cleared on refresh');
     
     try {
         await Promise.all([
@@ -304,6 +309,12 @@ function sortCurrentJobs(column) {
 async function showJobDetails(jobid) {
     debugLog(`Opening job details modal for job: ${jobid}`);
     
+    // Clear cache if switching to a different job
+    if (currentJobId !== jobid) {
+        jobDetailsCache = {};
+        debugLog('Cache cleared - switched to different job');
+    }
+    
     // Set the current job ID globally
     currentJobId = jobid;
     
@@ -360,6 +371,16 @@ function setupJobDetailsTabs() {
 
 // Load job overview
 async function loadJobOverview(jobid) {
+    const cacheKey = `overview_${jobid}`;
+    
+    // Check cache first
+    if (jobDetailsCache[cacheKey]) {
+        debugLog(`Using cached overview for job: ${jobid}`);
+        const details = jobDetailsCache[cacheKey];
+        renderJobOverviewData(details);
+        return;
+    }
+    
     try {
         debugLog(`Fetching job overview for job: ${jobid}`);
         
@@ -370,12 +391,27 @@ async function loadJobOverview(jobid) {
         
         if (result.success) {
             const details = result.data;
+            // Cache the data
+            jobDetailsCache[cacheKey] = details;
             debugLog('Job details:', details);
             
-            const content = document.getElementById('job-details-content');
-            
-            // Build details HTML with conditional fields based on what's available
-            let detailsHtml = `
+            // Render the data
+            renderJobOverviewData(details);
+        } else {
+            throw new Error(result.error || 'Failed to load job details');
+        }
+    } catch (error) {
+        document.getElementById('job-details-content').innerHTML = 
+            `<div class="error">Error loading job overview: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// Render job overview data (extracted for reusability)
+function renderJobOverviewData(details) {
+    const content = document.getElementById('job-details-content');
+    
+    // Build details HTML with conditional fields based on what's available
+    let detailsHtml = `
                 <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
                     <i class="fas fa-info-circle"></i> <strong>Job Info:</strong> Essential job metadata including times, resources, and locations
                 </p>
@@ -485,17 +521,22 @@ async function loadJobOverview(jobid) {
                 </div>
                 ` : ''}
             </div>`;
-            
-            content.innerHTML = detailsHtml;
-        }
-    } catch (error) {
-        document.getElementById('job-details-content').innerHTML = 
-            '<div class="text-center text-muted">Failed to load job details</div>';
-    }
+    
+    content.innerHTML = detailsHtml;
 }
 
 // Load job efficiency
 async function loadJobEfficiency(jobid) {
+    const cacheKey = `efficiency_${jobid}`;
+    
+    // Check cache first
+    if (jobDetailsCache[cacheKey]) {
+        debugLog(`Using cached efficiency for job: ${jobid}`);
+        const eff = jobDetailsCache[cacheKey];
+        renderJobEfficiencyData(eff);
+        return;
+    }
+    
     try {
         debugLog(`Fetching job efficiency for job: ${jobid}`);
         
@@ -506,11 +547,25 @@ async function loadJobEfficiency(jobid) {
         
         if (result.success) {
             const eff = result.data;
+            // Cache the data
+            jobDetailsCache[cacheKey] = eff;
             debugLog('Job efficiency data:', eff);
             
-            const content = document.getElementById('job-details-content');
-            
-            content.innerHTML = `
+            renderJobEfficiencyData(eff);
+        } else {
+            throw new Error(result.error || 'Failed to load efficiency data');
+        }
+    } catch (error) {
+        document.getElementById('job-details-content').innerHTML = 
+            `<div class="error">Error loading job efficiency: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
+// Render job efficiency data (extracted for reusability)
+function renderJobEfficiencyData(eff) {
+    const content = document.getElementById('job-details-content');
+    
+    content.innerHTML = `
                 <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px; padding: 10px; background: #f0f8ff; border-radius: 6px;">
                     <i class="fas fa-chart-line"></i> <strong>Resource Utilization:</strong> How efficiently your job used allocated CPU and memory (via <code>seff</code>)
                 </p>
@@ -553,15 +608,20 @@ async function loadJobEfficiency(jobid) {
                     <pre class="raw-output">${escapeHtml(eff.raw_output || 'No output available')}</pre>
                 </div>
             `;
-        }
-    } catch (error) {
-        document.getElementById('job-details-content').innerHTML = 
-            '<div class="text-center text-muted">Failed to load job efficiency. This command may not be available.</div>';
-    }
 }
 
 // Load job info (using jobinfo script)
 async function loadJobInfo(jobid) {
+    const cacheKey = `info_${jobid}`;
+    
+    // Check cache first
+    if (jobDetailsCache[cacheKey]) {
+        debugLog(`Using cached jobinfo for job: ${jobid}`);
+        const info = jobDetailsCache[cacheKey];
+        renderJobInfoData(info);
+        return;
+    }
+    
     try {
         debugLog(`Fetching detailed job info (jobinfo) for job: ${jobid}`);
         
@@ -572,53 +632,72 @@ async function loadJobInfo(jobid) {
         
         if (result.success) {
             const info = result.data;
+            // Cache the data
+            jobDetailsCache[cacheKey] = info;
             debugLog('Jobinfo data:', info);
             
-            const content = document.getElementById('job-details-content');
-            
-            if (info.error) {
-                content.innerHTML = `
-                    <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px; padding: 10px; background: #fff3cd; border-radius: 6px;">
-                        <i class="fas fa-exclamation-triangle"></i> <strong>I/O & Performance:</strong> Detailed disk I/O and CPU breakdown analysis (via <code>jobinfo</code> script)
-                    </p>
-                    <div class="text-center text-muted">${escapeHtml(info.error)}</div>
-                `;
-                return;
-            }
-            
-            let fieldsHtml = '';
-            if (info.fields && Object.keys(info.fields).length > 0) {
-                fieldsHtml = '<div class="details-grid">';
-                for (const [key, value] of Object.entries(info.fields)) {
-                    fieldsHtml += `
-                        <div class="detail-item">
-                            <div class="detail-label">${escapeHtml(key)}</div>
-                            <div class="detail-value">${escapeHtml(value)}</div>
-                        </div>
-                    `;
-                }
-                fieldsHtml += '</div>';
-            }
-            
-            content.innerHTML = `
-                <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px; padding: 10px; background: #e7f3ff; border-radius: 6px;">
-                    <i class="fas fa-tachometer-alt"></i> <strong>I/O & Performance:</strong> Disk I/O statistics and CPU time breakdown - shows if your job is I/O bound or compute bound (via <code>jobinfo</code> script)
-                </p>
-                ${fieldsHtml}
-                <div style="margin-top: 20px;">
-                    <h3 style="margin-bottom: 15px;">Raw Output</h3>
-                    <pre class="raw-output">${escapeHtml(info.raw_output || 'No output available')}</pre>
-                </div>
-            `;
+            renderJobInfoData(info);
+        } else {
+            throw new Error(result.error || 'Failed to load job info');
         }
     } catch (error) {
         document.getElementById('job-details-content').innerHTML = 
-            '<div class="text-center text-muted">Failed to load detailed job info</div>';
+            `<div class="error">Error loading job info: ${escapeHtml(error.message)}</div>`;
     }
+}
+
+// Render job info data (extracted for reusability)
+function renderJobInfoData(info) {
+    const content = document.getElementById('job-details-content');
+    
+    if (info.error) {
+        content.innerHTML = `
+            <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px; padding: 10px; background: #fff3cd; border-radius: 6px;">
+                <i class="fas fa-exclamation-triangle"></i> <strong>I/O & Performance:</strong> Detailed disk I/O and CPU breakdown analysis (via <code>jobinfo</code> script)
+            </p>
+            <div class="text-center text-muted">${escapeHtml(info.error)}</div>
+        `;
+        return;
+    }
+    
+    let fieldsHtml = '';
+    if (info.fields && Object.keys(info.fields).length > 0) {
+        fieldsHtml = '<div class="details-grid">';
+        for (const [key, value] of Object.entries(info.fields)) {
+            fieldsHtml += `
+                <div class="detail-item">
+                    <div class="detail-label">${escapeHtml(key)}</div>
+                    <div class="detail-value">${escapeHtml(value)}</div>
+                </div>
+            `;
+        }
+        fieldsHtml += '</div>';
+    }
+    
+    content.innerHTML = `
+        <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px; padding: 10px; background: #e7f3ff; border-radius: 6px;">
+            <i class="fas fa-tachometer-alt"></i> <strong>I/O & Performance:</strong> Disk I/O statistics and CPU time breakdown - shows if your job is I/O bound or compute bound (via <code>jobinfo</code> script)
+        </p>
+        ${fieldsHtml}
+        <div style="margin-top: 20px;">
+            <h3 style="margin-bottom: 15px;">Raw Output</h3>
+            <pre class="raw-output">${escapeHtml(info.raw_output || 'No output available')}</pre>
+        </div>
+    `;
 }
 
 // Load raw job data
 async function loadJobRaw(jobid) {
+    const cacheKey = `raw_${jobid}`;
+    
+    // Check cache first (raw data is same as overview, so we can reuse it)
+    if (jobDetailsCache[cacheKey] || jobDetailsCache[`overview_${jobid}`]) {
+        debugLog(`Using cached raw data for job: ${jobid}`);
+        const details = jobDetailsCache[cacheKey] || jobDetailsCache[`overview_${jobid}`];
+        renderJobRawData(details);
+        return;
+    }
+    
     try {
         debugLog(`Fetching raw job data for job: ${jobid}`);
         
@@ -629,25 +708,35 @@ async function loadJobRaw(jobid) {
         
         if (result.success) {
             const details = result.data;
-            const content = document.getElementById('job-details-content');
+            // Cache the data
+            jobDetailsCache[cacheKey] = details;
             
-            const title = details.is_historical ? 'sacct -o ALL Output' : 'scontrol show jobid -dd Output';
-            const commandInfo = details.is_historical 
-                ? 'Complete historical job data from SLURM accounting database'
-                : 'Real-time detailed information from SLURM controller';
-            
-            content.innerHTML = `
-                <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
-                    <i class="fas fa-terminal"></i> <strong>Raw SLURM Data:</strong> ${commandInfo} - useful for debugging and advanced analysis
-                </p>
-                <h3 style="margin-bottom: 15px;">${title}</h3>
-                <pre class="raw-output">${escapeHtml(details.raw_output || 'No output available')}</pre>
-            `;
+            renderJobRawData(details);
+        } else {
+            throw new Error(result.error || 'Failed to load raw job data');
         }
     } catch (error) {
         document.getElementById('job-details-content').innerHTML = 
-            '<div class="text-center text-muted">Failed to load raw job data</div>';
+            `<div class="error">Error loading raw job data: ${escapeHtml(error.message)}</div>`;
     }
+}
+
+// Render raw job data (extracted for reusability)
+function renderJobRawData(details) {
+    const content = document.getElementById('job-details-content');
+    
+    const title = details.is_historical ? 'sacct -o ALL Output' : 'scontrol show jobid -dd Output';
+    const commandInfo = details.is_historical 
+        ? 'Complete historical job data from SLURM accounting database'
+        : 'Real-time detailed information from SLURM controller';
+    
+    content.innerHTML = `
+        <p style="color: #666; font-size: 0.9rem; margin-bottom: 20px; padding: 10px; background: #f8f9fa; border-radius: 6px;">
+            <i class="fas fa-terminal"></i> <strong>Raw SLURM Data:</strong> ${commandInfo} - useful for debugging and advanced analysis
+        </p>
+        <h3 style="margin-bottom: 15px;">${title}</h3>
+        <pre class="raw-output">${escapeHtml(details.raw_output || 'No output available')}</pre>
+    `;
 }
 
 // Utility functions
