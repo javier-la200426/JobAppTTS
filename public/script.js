@@ -57,10 +57,16 @@ function initializeEventListeners() {
         loadJobHistory();
     });
     
-    // Table sorting
-    document.querySelectorAll('[data-sort]').forEach(th => {
+    // Table sorting - setup for both current and history tables
+    document.querySelectorAll('#current-jobs-table [data-sort]').forEach(th => {
         th.addEventListener('click', () => {
             sortCurrentJobs(th.dataset.sort);
+        });
+    });
+    
+    document.querySelectorAll('#history-jobs-table [data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            sortHistoryJobs(th.dataset.sort);
         });
     });
 }
@@ -212,7 +218,7 @@ function renderHistoryJobs(jobs) {
     const tbody = document.getElementById('history-jobs-table-body');
     
     if (jobs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted">No job history found for selected time period</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="12" class="text-center text-muted">No job history found for selected time period</td></tr>';
         return;
     }
     
@@ -229,7 +235,6 @@ function renderHistoryJobs(jobs) {
             <td>${job.nodes}</td>
             <td>${job.cpus}</td>
             <td>${job.gpus || 0}</td>
-            <td>${escapeHtml(job.exit_code)}</td>
             <td>
                 <button class="btn btn-info" onclick="showJobDetails('${escapeHtml(job.job_id)}')">
                     <i class="fas fa-info-circle"></i> Details
@@ -303,6 +308,32 @@ function sortCurrentJobs(column) {
     });
     
     filterCurrentJobs();
+}
+
+// Sort history jobs
+function sortHistoryJobs(column) {
+    if (historySortColumn === column) {
+        historySortDirection = historySortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        historySortColumn = column;
+        historySortDirection = 'asc';
+    }
+    
+    historyJobs.sort((a, b) => {
+        let aVal = a[column];
+        let bVal = b[column];
+        
+        if (typeof aVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+        
+        if (aVal < bVal) return historySortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return historySortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    filterHistoryJobs();
 }
 
 // Show job details modal
