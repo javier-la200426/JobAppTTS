@@ -1,6 +1,7 @@
 # Job Monitor Dashboard
 
 A comprehensive web-based dashboard for monitoring and managing SLURM jobs, featuring intelligent dual-mode operation that automatically uses the appropriate SLURM commands for both active (running/pending) and historical (completed/cancelled/failed) jobs.
+
 <img width="1241" height="938" alt="tufts-systemstatus" src="https://github.com/user-attachments/assets/2f10b0ef-68aa-48d5-833b-e8fc24eb7a4f" />
 
 ## Features
