@@ -3,8 +3,10 @@
 A comprehensive web-based dashboard for monitoring and managing SLURM jobs, featuring intelligent dual-mode operation that automatically uses the appropriate SLURM commands for both active (running/pending) and historical (completed/cancelled/failed) jobs.
 
 <img width="1241" height="938" alt="tufts-systemstatus" src="https://github.com/user-attachments/assets/2f10b0ef-68aa-48d5-833b-e8fc24eb7a4f" />
+<img width="1253" height="626" alt="Screenshot 2025-12-18 at 11 03 19 AM" src="https://github.com/user-attachments/assets/491c4cdc-f72f-4b03-ade3-abba6d53fe8f" />
 
 ## Features
+
 
 ### 📊 Real-time Job Monitoring
 - View all your current running and pending jobs via `squeue`
